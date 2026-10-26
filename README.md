@@ -26,13 +26,13 @@ Real-time quota and token telemetry bar for **Antigravity CLI (`agy`)** and **Cl
 Install via the Antigravity CLI plugin manager:
 
 ```bash
-agy plugin install https://github.com/<owner>/status-line
+agy plugin install https://github.com/Striga7z/status-line
 ```
 
 Or clone manually into your global plugins directory:
 
 ```bash
-git clone https://github.com/<owner>/status-line ~/.gemini/config/plugins/status-line
+git clone https://github.com/Striga7z/status-line ~/.gemini/config/plugins/status-line
 ```
 
 Activate in the Antigravity CLI chat input:
@@ -60,7 +60,7 @@ To revert to the default status line:
 Clone the plugin into `~/.claude/plugins/status-line` (or reuse `~/.gemini/config/plugins/status-line`):
 
 ```bash
-git clone https://github.com/<owner>/status-line ~/.claude/plugins/status-line
+git clone https://github.com/Striga7z/status-line ~/.claude/plugins/status-line
 ```
 
 Add the `statusLine` block to `~/.claude/settings.json`:
