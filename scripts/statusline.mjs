@@ -13,6 +13,7 @@ const FG = {
   yellow: `${ESC}[38;5;221m`,
   red: `${ESC}[38;5;203m`,
   purple: `${ESC}[38;5;141m`,
+  emerald: `${ESC}[38;5;120m`,
   gray: `${ESC}[38;5;245m`,
   white: `${ESC}[38;5;255m`,
   border: `${ESC}[38;5;240m`,
@@ -37,12 +38,35 @@ function makeBar(pct, width = 10, color = FG.green) {
   return `${color}${'█'.repeat(filled)}${FG.border}${'░'.repeat(empty)}${RESET}`;
 }
 
-function formatDuration(seconds, resetTimeIso) {
-  let sec = typeof seconds === 'number' ? seconds : null;
-  if ((sec === null || Number.isNaN(sec)) && resetTimeIso) {
-    const diff = Math.floor((new Date(resetTimeIso).getTime() - Date.now()) / 1000);
-    if (!Number.isNaN(diff)) sec = Math.max(0, diff);
+function resolveRemainingSeconds(bucket) {
+  if (!bucket || typeof bucket !== 'object') return null;
+
+  if (typeof bucket.reset_in_seconds === 'number' && !Number.isNaN(bucket.reset_in_seconds)) {
+    return Math.max(0, Math.floor(bucket.reset_in_seconds));
   }
+
+  const target = bucket.resets_at ?? bucket.reset_time ?? null;
+  if (typeof target === 'number' && !Number.isNaN(target)) {
+    const epochMs = target > 1e12 ? target : target * 1000;
+    return Math.max(0, Math.floor((epochMs - Date.now()) / 1000));
+  }
+
+  if (typeof target === 'string' && target.trim()) {
+    const asNum = Number(target);
+    if (!Number.isNaN(asNum)) {
+      const epochMs = asNum > 1e12 ? asNum : asNum * 1000;
+      return Math.max(0, Math.floor((epochMs - Date.now()) / 1000));
+    }
+    const parsed = new Date(target).getTime();
+    if (!Number.isNaN(parsed)) {
+      return Math.max(0, Math.floor((parsed - Date.now()) / 1000));
+    }
+  }
+
+  return null;
+}
+
+function formatDuration(sec) {
   if (sec === null || sec <= 0) return 'now';
 
   const d = Math.floor(sec / 86400);
@@ -61,6 +85,13 @@ function formatTokens(n) {
   return `${num}`;
 }
 
+function formatCost(usd) {
+  const num = Number(usd);
+  if (Number.isNaN(num) || num <= 0) return '';
+  const formatted = num < 0.01 ? num.toFixed(4) : num.toFixed(2);
+  return ` ${FG.emerald}$${formatted}${RESET}`;
+}
+
 function findQuotaBucket(quotaObj, patterns) {
   if (!quotaObj || typeof quotaObj !== 'object') return null;
   for (const key of Object.keys(quotaObj)) {
@@ -72,21 +103,30 @@ function findQuotaBucket(quotaObj, patterns) {
   return null;
 }
 
+function resolveRemainingPct(bucket) {
+  if (typeof bucket.remaining_fraction === 'number') {
+    return Math.round(bucket.remaining_fraction * 100);
+  }
+  if (typeof bucket.remaining_percentage === 'number') {
+    return Math.round(bucket.remaining_percentage);
+  }
+  if (typeof bucket.used_percentage === 'number') {
+    return Math.round(Math.max(0, Math.min(100, 100 - bucket.used_percentage)));
+  }
+  if (typeof bucket.used_fraction === 'number') {
+    return Math.round(Math.max(0, Math.min(100, (1 - bucket.used_fraction) * 100)));
+  }
+  return 100;
+}
+
 function renderQuotaSegment(label, bucket) {
   if (!bucket || bucket.disabled) {
     return `${FG.gray}${label}:${RESET} ${DIM}--${RESET}`;
   }
-  const remFraction =
-    typeof bucket.remaining_fraction === 'number'
-      ? bucket.remaining_fraction
-      : typeof bucket.remaining_percentage === 'number'
-        ? bucket.remaining_percentage / 100
-        : null;
-
-  const remPct = remFraction !== null ? Math.round(remFraction * 100) : 100;
+  const remPct = Math.max(0, Math.min(100, resolveRemainingPct(bucket)));
   const color = colorByRemaining(remPct);
   const bar = makeBar(remPct, 8, color);
-  const resetStr = formatDuration(bucket.reset_in_seconds, bucket.reset_time);
+  const resetStr = formatDuration(resolveRemainingSeconds(bucket));
 
   return `${BOLD}${FG.white}${label}${RESET} ${bar} ${color}${BOLD}${remPct}%${RESET} ${FG.gray}(↻ ${resetStr})${RESET}`;
 }
@@ -106,22 +146,35 @@ try {
 }
 
 const quota = data.quota || {};
+const rateLimits = data.rate_limits || {};
+
 const bucket5h =
   quota['gemini-5h'] ||
   findQuotaBucket(quota, ['5h', 'five_hour', '5-hour']) ||
-  data.rate_limits?.five_hour ||
+  rateLimits.five_hour ||
+  findQuotaBucket(rateLimits, ['5h', 'five_hour', '5-hour']) ||
   null;
 
 const bucketWeek =
   quota['gemini-weekly'] ||
   findQuotaBucket(quota, ['week', '7d', 'seven_day']) ||
-  data.rate_limits?.seven_day ||
+  rateLimits.seven_day ||
+  findQuotaBucket(rateLimits, ['week', '7d', 'seven_day']) ||
   null;
 
 const cw = data.context_window || {};
-const inTokens = Number(cw.total_input_tokens) || 0;
-const outTokens = Number(cw.total_output_tokens) || 0;
+const currentUsage = cw.current_usage || {};
+
+const inTokens =
+  Number(cw.total_input_tokens) ||
+  Number(currentUsage.input_tokens) ||
+  0;
+const outTokens =
+  Number(cw.total_output_tokens) ||
+  Number(currentUsage.output_tokens) ||
+  0;
 const totalTokens = inTokens + outTokens;
+
 const usedPct =
   typeof cw.used_percentage === 'number'
     ? Number(cw.used_percentage.toFixed(1))
@@ -129,6 +182,7 @@ const usedPct =
       ? Number(((totalTokens / cw.context_window_size) * 100).toFixed(1))
       : 0;
 
+const costStr = formatCost(data.cost?.total_cost_usd);
 const ctxColor = colorByContextUsed(usedPct);
 const checkpointWarn = usedPct >= 85 ? ` ${FG.red}${BOLD}[⚠ CHECKPOINT %85+]${RESET}` : '';
 
@@ -139,7 +193,8 @@ const tokenBox =
   `${FG.border}⟦${RESET}` +
   `${BOLD}${FG.purple}TOKENS${RESET} ` +
   `${FG.white}${BOLD}${formatTokens(totalTokens)}${RESET} ` +
-  `${FG.gray}(In:${formatTokens(inTokens)} Out:${formatTokens(outTokens)})${RESET} ` +
+  `${FG.gray}(In:${formatTokens(inTokens)} Out:${formatTokens(outTokens)})${RESET}` +
+  `${costStr} ` +
   `${FG.border}│${RESET} ` +
   `${BOLD}CTX${RESET} ${makeBar(usedPct, 6, ctxColor)} ${ctxColor}${BOLD}${usedPct}%${RESET}` +
   `${checkpointWarn}` +

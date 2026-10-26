@@ -1,0 +1,5 @@
+{
+  "name": "status-line",
+  "version": "1.0.0",
+  "description": "Real-time quota and token telemetry bar for Antigravity CLI and Claude Code — displays 5H and Weekly rate limit bars with reset countdowns, session In/Out token breakdown, USD cost, context window gauge, and 85%+ checkpoint alerts."
+}

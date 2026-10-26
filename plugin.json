@@ -2,11 +2,11 @@
   "name": "status-line",
   "displayName": "Status Line",
   "version": "1.0.0",
-  "description": "5H Reset, Week Reset kota barlarını ve session içi toplam token / context kullanım kutusunu gösteren özel Status Line eklentisi.",
+  "description": "Real-time quota and token telemetry bar for Antigravity CLI and Claude Code — displays 5H and Weekly rate limit bars with reset countdowns, session In/Out token breakdown, USD cost, context window gauge, and 85%+ checkpoint alerts.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
-    "Status line barını kur ve aktif et",
-    "Status line görünümünü özelleştir",
-    "Status line sıfırla"
+    "Activate the status line bar",
+    "Customize status line layout or colors",
+    "Reset status line to default"
   ]
 }
