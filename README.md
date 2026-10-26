@@ -3,7 +3,9 @@
 Real-time quota and token telemetry bar for **Antigravity CLI (`agy`)** and **Claude Code (`claude`)**.
 
 ```text
+
 5H ███████░ 85% (↻ 1h 30m) │ WEEK █████░░░ 62% (↻ 4d 12h) │ ⟦TOKENS 149.3k (In:88.2k Out:61.1k) $0.42 │ CTX █░░░░░ 14.2%⟧
+
 ```
 
 ## Overview
